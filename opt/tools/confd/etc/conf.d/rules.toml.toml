@@ -1,0 +1,8 @@
+[template]
+src = "rules.toml.tmpl"
+dest = "/etc/nginx/conf.d/all-sites.conf"
+owner = "nginx"
+mode = "0644"
+keys = [
+  "/stacks",
+]

@@ -1,0 +1,16 @@
+#!/usr/local/bin/dumb-init /bin/bash
+
+/usr/sbin/nginx &
+
+while true
+do
+    inotifywait -e create -e modify -e delete -e move /etc/nginx/conf.d/all-sites.conf
+    nginx -t
+    if [ $? -eq 0 ]
+    then
+        echo "RELOADING NGINX"
+        /usr/sbin/nginx -s reload
+    else
+        echo "NGINX TEST FAILED"
+    fi
+done

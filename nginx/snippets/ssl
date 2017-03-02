@@ -1,0 +1,4 @@
+ssl_certificate /certs/local/public.crt;
+ssl_certificate_key /certs/local/private.key;
+ssl_protocols TLSv1.2;
+ssl_ciphers HIGH:!aNULL:!MD5;
