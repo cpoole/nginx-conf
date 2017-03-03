@@ -1,3 +1,67 @@
+stream {
+    upstream stream_backend {
+        server 127.0.0.1:500;
+    }
+
+    server{
+        listen 443 ssl;
+        proxy_pass stream_backend;
+
+        include /etc/nginx/snippets/ssl;
+
+    }
+
+
+{{ range $s, $stack_name := ls "/stacks" -}}
+    {{- range $i, $service_name := ls (printf "/stacks/%s/services" $stack_name) }}
+        {{- if exists (printf "/stacks/%s/services/%s/labels/nginx.enable" $stack_name $service_name) -}}
+            {{- $nginx_protocol := getv (printf "/stacks/%s/services/%s/labels/nginx.protocol" $stack_name $service_name) -}}
+            {{- $nginx_enable := getv (printf "/stacks/%s/services/%s/labels/nginx.enable" $stack_name $service_name) }}
+            {{- if eq $nginx_protocol "tcp" -}}
+
+               upstream {{$service_name}}-{{$stack_name}} {
+                   {{- range $i2, $container := lsdir (printf "/stacks/%s/services/%s/containers" $stack_name $service_name) -}}
+                       {{- $healthstatus := getv (printf "/stacks/%s/services/%s/containers/%s/health_state" $stack_name $service_name $container) -}}
+                       {{- if eq $healthstatus "healthy" }}
+                           server {{getv (printf "/stacks/%s/services/%s/containers/%s/primary_ip" $stack_name $service_name $container)}}:{{getv (printf "/stacks/%s/services/%s/labels/nginx.port" $stack_name $service_name)}};
+                       {{ end -}}
+                   {{- end }}
+               }
+               server {
+                   listen {{getv (printf "/stacks/%s/services/%s/labels/nginx.port" $stack_name $service_name)}};
+                   proxy_pass {{$service_name}}-{{$stack_name}};
+               }
+           {{ end -}}
+       {{- end -}}
+   {{- end -}}
+{{- end - }}
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    log_format  main  '[$host] $proxy_protocol_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log  /dev/stdout  main;
+
+    sendfile        on;
+    #tcp_nopush     on;
+
+    keepalive_timeout  60;
+
+    #gzip  on;
+    server {
+        listen 8000;
+        location /elb-status {
+            keepalive_timeout 0;    # Disable HTTP keepalive
+            access_log off;
+            return 200;
+        }
+    }
+
 {{ range $s, $stack_name := ls "/stacks" -}}
     {{- range $i, $service_name := ls (printf "/stacks/%s/services" $stack_name) }}
         {{- if exists (printf "/stacks/%s/services/%s/labels/nginx.enable" $stack_name $service_name) -}}
@@ -18,7 +82,7 @@
             {{- if eq $nginx_protocol "http" "https" "ws" "wss" -}}
                 {{- if eq $nginx_enable "service" -}}
                     {{- $nginx_tld := getv (printf "/stacks/%s/services/%s/labels/nginx.tld" $stack_name $service_name) -}}
-                    {{- $server_name := printf "%s.%s.%s" $service_name $stack_name $nginx_tld -}}
+                    {{- $server_name := printf "%s.%s.%s" $service_name $stack_name $nginx_tld }}
 
                     map $http_upgrade $connection_upgrade {
                         default upgrade;
@@ -35,10 +99,9 @@
                     }
 
                     server {
-                        listen 443 proxy_protocol;
-                        include snippets/ssl;
+                        listen 500 proxy_protocol;
                         server_name {{$server_name}};
-
+                        real_ip_header proxy_protocol;
 
                         location / {
                             {{ if eq $nginx_protocol "ws" "wss" -}}
@@ -55,7 +118,7 @@
                         }
                     }
 
-                {{- else if eq $nginx_enable "stack" -}}
+                 {{- else if eq $nginx_enable "stack" -}}
                     {{- $nginx_tld := getv (printf "/stacks/%s/services/%s/labels/nginx.tld" $stack_name $service_name) -}}
                     {{- $server_name := printf "%s.%s." $stack_name $nginx_tld -}}
 
@@ -74,10 +137,9 @@
                     }
 
                     server {
-                        listen 443 proxy_protocol;
-                        include snippets/ssl;
+                        listen 500 proxy_protocol;
                         server_name {{$server_name}};
-
+                        real_ip_header proxy_protocol;
 
                         location / {
                             {{ if eq $nginx_protocol "ws" "wss" -}}
@@ -113,10 +175,9 @@
                     }
 
                     server {
-                        listen 443 proxy_protocol;
-                        include snippets/ssl;
+                        listen 500 proxy_protocol;
                         server_name {{$server_name}};
-
+                        real_ip_header proxy_protocol;
 
                         location / {
                             {{ if eq $nginx_protocol "ws" "wss" -}}
@@ -134,14 +195,8 @@
                     }
 
                 {{- end }}
-
-            {{- else if eq $nginx_protocol "tcp" -}}
-
-                server {
-                    listen {{getv (printf "/stacks/%s/services/%s/labels/nginx.port" $stack_name $service_name)}};
-                    proxy_pass {{$service_name}}-{{$stack_name}};
-                }
             {{ end -}}
         {{ end -}}
     {{ end -}}
 {{ end -}}
+}
