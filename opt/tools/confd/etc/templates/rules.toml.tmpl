@@ -50,13 +50,12 @@ http {
     sendfile        on;
     #tcp_nopush     on;
 
-    keepalive_timeout  60;
+    keepalive_timeout  75;
 
     #gzip  on;
     server {
         listen 8000;
         location /elb-status {
-            keepalive_timeout 0;    # Disable HTTP keepalive
             access_log off;
             return 200;
         }
@@ -68,18 +67,18 @@ http {
             {{- $nginx_protocol := getv (printf "/stacks/%s/services/%s/labels/nginx.protocol" $stack_name $service_name) -}}
             {{- $nginx_enable := getv (printf "/stacks/%s/services/%s/labels/nginx.enable" $stack_name $service_name) }}
 
-            upstream {{$service_name}}-{{$stack_name}} {
-                {{- range $i2, $container := lsdir (printf "/stacks/%s/services/%s/containers" $stack_name $service_name) -}}
-                    {{- $healthstatus := getv (printf "/stacks/%s/services/%s/containers/%s/health_state" $stack_name $service_name $container) -}}
-                    {{- if eq $healthstatus "healthy" }}
-                        server {{getv (printf "/stacks/%s/services/%s/containers/%s/primary_ip" $stack_name $service_name $container)}}:{{getv (printf "/stacks/%s/services/%s/labels/nginx.port" $stack_name $service_name)}};
-                    {{ end -}}
-                {{- end }}
-            }
-
-
-
             {{- if eq $nginx_protocol "http" "https" "ws" "wss" -}}
+
+                upstream {{$service_name}}-{{$stack_name}} {
+                    {{- range $i2, $container := lsdir (printf "/stacks/%s/services/%s/containers" $stack_name $service_name) -}}
+                        {{- $healthstatus := getv (printf "/stacks/%s/services/%s/containers/%s/health_state" $stack_name $service_name $container) -}}
+                        {{- if eq $healthstatus "healthy" }}
+                            server {{getv (printf "/stacks/%s/services/%s/containers/%s/primary_ip" $stack_name $service_name $container)}}:{{getv (printf "/stacks/%s/services/%s/labels/nginx.port" $stack_name $service_name)}};
+                        {{ end -}}
+                    {{- end }}
+                }
+
+
                 {{- if eq $nginx_enable "service" -}}
                     {{- $nginx_tld := getv (printf "/stacks/%s/services/%s/labels/nginx.tld" $stack_name $service_name) -}}
                     {{- $server_name := printf "%s.%s.%s" $service_name $stack_name $nginx_tld }}
@@ -109,7 +108,7 @@ http {
                                 proxy_set_header Upgrade $http_upgrade;
                                 proxy_set_header Connection $connection_upgrade;
                             {{- end -}}
-                            {{ if eq $nginx_protocol "ws" "https" -}}
+                            {{ if eq $nginx_protocol "wss" "https" -}}
                                 proxy_pass https://{{$service_name}}-{{$stack_name}};
                                 proxy_ssl_verify off;
                             {{ else }}
@@ -147,7 +146,7 @@ http {
                                 proxy_set_header Upgrade $http_upgrade;
                                 proxy_set_header Connection $connection_upgrade;
                             {{- end -}}
-                            {{ if eq $nginx_protocol "ws" "https" -}}
+                            {{ if eq $nginx_protocol "wss" "https" -}}
                                 proxy_pass https://{{$service_name}}-{{$stack_name}};
                                 proxy_ssl_verify off;
                             {{ else }}
@@ -185,7 +184,7 @@ http {
                                 proxy_set_header Upgrade $http_upgrade;
                                 proxy_set_header Connection $connection_upgrade;
                             {{- end -}}
-                            {{ if eq $nginx_protocol "ws" "https" -}}
+                            {{ if eq $nginx_protocol "wss" "https" -}}
                                 proxy_pass https://{{$service_name}}-{{$stack_name}};
                                 proxy_ssl_verify off;
                             {{ else }}
