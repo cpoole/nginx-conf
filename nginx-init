@@ -12,5 +12,6 @@ do
         /usr/sbin/nginx -s reload
     else
         echo "NGINX TEST FAILED"
+        sleep 5
     fi
 done
