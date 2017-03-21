@@ -17,7 +17,7 @@ This repo contains the docker-compose and rancher-compose files needed to deploy
 
 The following labels can be be added to your service.
 
-* nginx.enable = *service | stack | manual | tcp* #Controls if and how you want to publish or not the service.
+* nginx.enable = *service | stack | manual | tcp*
     * true: the service will be published as *service_name.stack_name.nginx_tld*
     * stack: the service will be published as *stack_name.nginx_tld*. WARNING: You can have collisions inside services within your stack
     * manual: the service frontend will be published as the labels *nginx_fqdn*
@@ -28,6 +28,10 @@ The following labels can be be added to your service.
 * nginx.protocol = *http | https | ws | wss | tcp* will set your backend protocol.
 * nginx.fqdn= *Fully Qualified Domain Name to route rules. Multiple domains separated by ",". Be careful, collisions are possible!*
     * **OPTIONAL:** only required if setting nginx.enable to manual. This label sets the fqdn
+* nginx.proxyprotocol= *true | false*
+    * **OPTIONAL:** only required if the backend service is expecting incoming traffic with the PROXY_PROTOCOL header
+
+
 
 WARNING: Only services with healthy state are added to nginx, so health checks are mandatory.
 

@@ -30,6 +30,12 @@ stream {
                server {
                    listen {{getv (printf "/stacks/%s/services/%s/labels/nginx.port" $stack_name $service_name)}};
                    proxy_pass {{$service_name}}-{{$stack_name}};
+                   {{- if exists (printf "/stacks/%s/services/%s/labels/nginx.proxyprotocol" $stack_name $service_name) }}
+                   {{- $proxy_protocol := getv (printf "/stacks/%s/services/%s/labels/nginx.proxyprotocol" $stack_name $service_name) }}
+                   {{ if eq $proxy_protocol "true" -}}
+                   proxy_protocol on;
+                   {{- end -}}
+                   {{- end }}
                }
            {{ end -}}
        {{- end -}}
@@ -54,7 +60,7 @@ http {
 
     #gzip  on;
     server {
-        listen 8000;
+        listen 8001;
         location /elb-status {
             access_log off;
             return 200;

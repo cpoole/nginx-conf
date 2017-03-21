@@ -1,8 +1,17 @@
-nginx:
-  retain_ip: true
-  health_check:
-    port: 80
-    interval: 5000
-    unhealthy_threshold: 3
-    healthy_threshold: 2
-    response_timeout: 5000
+version: '2'
+
+services:
+  nginx:
+    retain_ip: true
+    start_on_create: true
+    health_check:
+      port: 8001
+      request_line: GET /elb-status # HTTP/1.0
+      interval: 5000
+      unhealthy_threshold: 3
+      healthy_threshold: 2
+      response_timeout: 5000
+      strategy: recreate
+  nginx-conf:
+    retain_ip: true
+    start_on_create: true
