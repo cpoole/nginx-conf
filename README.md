@@ -48,4 +48,4 @@ The following environment variables can be used to override the defaults:
 ## Deployment
 ```rancher-compose up --upgrade -d```
 
-
+DISCLAIMER: This stack was inspired by @rawmind0's traefik proxy stack in the rancher catalog
