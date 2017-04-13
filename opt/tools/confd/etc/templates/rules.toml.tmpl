@@ -14,32 +14,35 @@ stream {
 
 {{ range $s, $stack_name := ls "/stacks" -}}
     {{- range $i, $service_name := ls (printf "/stacks/%s/services" $stack_name) }}
-        {{- if exists (printf "/stacks/%s/services/%s/labels/nginx.enable" $stack_name $service_name) -}}
-            {{- $nginx_protocol := getv (printf "/stacks/%s/services/%s/labels/nginx.protocol" $stack_name $service_name) -}}
+        {{- if and (exists (printf "/stacks/%s/services/%s/labels/nginx.enable" $stack_name $service_name)) (exists (printf "/stacks/%s/services/%s/labels/nginx.layer4" $stack_name $service_name)) -}}
+            {{- $nginx_protocol := getv (printf "/stacks/%s/services/%s/labels/nginx.layer4" $stack_name $service_name) -}}
             {{- $nginx_enable := getv (printf "/stacks/%s/services/%s/labels/nginx.enable" $stack_name $service_name) }}
-            {{- if eq $nginx_protocol "tcp" -}}
 
-               upstream {{$service_name}}-{{$stack_name}} {
-                   {{- range $i2, $container := lsdir (printf "/stacks/%s/services/%s/containers" $stack_name $service_name) -}}
-                       {{- $healthstatus := getv (printf "/stacks/%s/services/%s/containers/%s/health_state" $stack_name $service_name $container) -}}
-                       {{- if eq $healthstatus "healthy" }}
-                           server {{getv (printf "/stacks/%s/services/%s/containers/%s/primary_ip" $stack_name $service_name $container)}}:{{getv (printf "/stacks/%s/services/%s/labels/nginx.port" $stack_name $service_name)}};
-                       {{ end -}}
-                   {{- end }}
-               }
-               server {
-                   listen {{getv (printf "/stacks/%s/services/%s/labels/nginx.port" $stack_name $service_name)}};
-                   proxy_pass {{$service_name}}-{{$stack_name}};
-                   {{- if exists (printf "/stacks/%s/services/%s/labels/nginx.proxyprotocol" $stack_name $service_name) }}
-                   {{- $proxy_protocol := getv (printf "/stacks/%s/services/%s/labels/nginx.proxyprotocol" $stack_name $service_name) }}
-                   {{ if eq $proxy_protocol "true" -}}
-                   proxy_protocol on;
-                   {{- end -}}
-                   {{- end }}
-               }
-           {{ end -}}
-       {{- end -}}
-   {{- end -}}
+            {{- $protocol_list := split $nginx_protocol "," }}
+            {{range $i2, $protocol_group := $protocol_list }}
+                {{- $protocol := (index (split (index (split $protocol_group ":") 0) "%") 0) }}
+                {{- $proxy_protocol := (index (split (index (split $protocol_group ":") 0) "%") 1) -}}
+                {{- $port := (index (split $protocol_group ":") 1) }}
+                {{- if eq $protocol "tcp" }}
+                    upstream {{$service_name}}-{{$stack_name}}-{{$port}} {
+                        {{- range $i2, $container := lsdir (printf "/stacks/%s/services/%s/containers" $stack_name $service_name) -}}
+                            {{- $healthstatus := getv (printf "/stacks/%s/services/%s/containers/%s/health_state" $stack_name $service_name $container) -}}
+                            {{- if eq $healthstatus "healthy" }}
+                                server {{getv (printf "/stacks/%s/services/%s/containers/%s/primary_ip" $stack_name $service_name $container)}}:{{$port}};
+                            {{ end -}}
+                        {{- end }}
+                    }
+                    server {
+                        listen {{$port}};
+                        proxy_pass {{$service_name}}-{{$stack_name}}-{{$port}};
+                        {{ if eq $proxy_protocol "pptrue" -}}
+                            proxy_protocol on;
+                        {{- end }}
+                    }
+                {{ end -}}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
 {{- end -}}
 }
 
@@ -69,20 +72,25 @@ http {
 
 {{ range $s, $stack_name := ls "/stacks" -}}
     {{- range $i, $service_name := ls (printf "/stacks/%s/services" $stack_name) }}
-        {{- if exists (printf "/stacks/%s/services/%s/labels/nginx.enable" $stack_name $service_name) -}}
-            {{- $nginx_protocol := getv (printf "/stacks/%s/services/%s/labels/nginx.protocol" $stack_name $service_name) -}}
+         {{- if and (exists (printf "/stacks/%s/services/%s/labels/nginx.enable" $stack_name $service_name)) (exists (printf "/stacks/%s/services/%s/labels/nginx.layer7" $stack_name $service_name)) -}}
+            {{- $nginx_protocol := getv (printf "/stacks/%s/services/%s/labels/nginx.layer7" $stack_name $service_name) -}}
             {{- $nginx_enable := getv (printf "/stacks/%s/services/%s/labels/nginx.enable" $stack_name $service_name) }}
 
-            {{- if eq $nginx_protocol "http" "https" "ws" "wss" -}}
+            {{- $protocol := (index (split (index (split $nginx_protocol ":") 0) "%") 0) }}
+            {{- $proxy_protocol := (index (split (index (split $nginx_protocol ":") 0) "%") 1) -}}
+            {{- $port := (index (split $nginx_protocol ":") 1) }}
+
+            {{- if eq $protocol "http" "https" "ws" "wss" -}}
 
                 upstream {{$service_name}}-{{$stack_name}} {
                     {{- range $i2, $container := lsdir (printf "/stacks/%s/services/%s/containers" $stack_name $service_name) -}}
                         {{- $healthstatus := getv (printf "/stacks/%s/services/%s/containers/%s/health_state" $stack_name $service_name $container) -}}
                         {{- if eq $healthstatus "healthy" }}
-                            server {{getv (printf "/stacks/%s/services/%s/containers/%s/primary_ip" $stack_name $service_name $container)}}:{{getv (printf "/stacks/%s/services/%s/labels/nginx.port" $stack_name $service_name)}};
+                            server {{getv (printf "/stacks/%s/services/%s/containers/%s/primary_ip" $stack_name $service_name $container)}}:{{$port}};
                         {{ end -}}
                     {{- end }}
                 }
+
 
 
                 {{- if eq $nginx_enable "service" -}}
@@ -109,12 +117,12 @@ http {
                         real_ip_header proxy_protocol;
 
                         location / {
-                            {{ if eq $nginx_protocol "ws" "wss" -}}
+                            {{ if eq $protocol "ws" "wss" -}}
                                 proxy_http_version 1.1;
                                 proxy_set_header Upgrade $http_upgrade;
                                 proxy_set_header Connection $connection_upgrade;
                             {{- end -}}
-                            {{ if eq $nginx_protocol "wss" "https" -}}
+                            {{ if eq $protocol "wss" "https" -}}
                                 proxy_pass https://{{$service_name}}-{{$stack_name}};
                                 proxy_ssl_verify off;
                             {{ else }}
@@ -123,7 +131,7 @@ http {
                         }
                     }
 
-                 {{- else if eq $nginx_enable "stack" -}}
+                {{- else if eq $nginx_enable "stack" -}}
                     {{- $nginx_tld := getv (printf "/stacks/%s/services/%s/labels/nginx.tld" $stack_name $service_name) -}}
                     {{- $server_name := printf "%s.%s." $stack_name $nginx_tld -}}
 
@@ -147,12 +155,12 @@ http {
                         real_ip_header proxy_protocol;
 
                         location / {
-                            {{ if eq $nginx_protocol "ws" "wss" -}}
+                            {{ if eq $protocol "ws" "wss" -}}
                                 proxy_http_version 1.1;
                                 proxy_set_header Upgrade $http_upgrade;
                                 proxy_set_header Connection $connection_upgrade;
                             {{- end -}}
-                            {{ if eq $nginx_protocol "wss" "https" -}}
+                            {{ if eq $protocol "wss" "https" -}}
                                 proxy_pass https://{{$service_name}}-{{$stack_name}};
                                 proxy_ssl_verify off;
                             {{ else }}
@@ -185,12 +193,12 @@ http {
                         real_ip_header proxy_protocol;
 
                         location / {
-                            {{ if eq $nginx_protocol "ws" "wss" -}}
+                            {{ if eq $protocol "ws" "wss" -}}
                                 proxy_http_version 1.1;
                                 proxy_set_header Upgrade $http_upgrade;
                                 proxy_set_header Connection $connection_upgrade;
                             {{- end -}}
-                            {{ if eq $nginx_protocol "wss" "https" -}}
+                            {{ if eq $protocol "wss" "https" -}}
                                 proxy_pass https://{{$service_name}}-{{$stack_name}};
                                 proxy_ssl_verify off;
                             {{ else }}
@@ -199,9 +207,9 @@ http {
                         }
                     }
 
-                {{- end }}
-            {{ end -}}
-        {{ end -}}
-    {{ end -}}
-{{ end -}}
+                {{ end -}}
+            {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
 }

@@ -24,12 +24,24 @@ The following labels can be be added to your service.
     * tcp: the service will be published as a layer 4 stream on a specific port
 * nginx.tld= *Top level domain names to route rules. Multiple domains separated by ","*
     * **OPTIONAL:** not required if you are in tcp or manual mode
-* nginx.port = *port to expose throught traefik*
-* nginx.protocol = *http | https | ws | wss | tcp* will set your backend protocol.
+* nginx.layer4 = a list of all layer4 upstream servers
+    * uses the format `protocol @ proxy protocol true or false: port nginx and your service listen on` 
+    * the only valid protocols are `tcp` or `udp`
+    * For example: I have a container with a tcp service listening on port 5000 whose listener is not expecting the PROXYPROTOCOL headers. 
+        * the `nginx.layer4` label has the value `tcp@ppfalse:5000`
+        * this will add a TCP listener to your nignx containers on port 5000 that forwards TCP traffic to your container(s) on port 5000
+    * For example: I have a container with a tcp service listening on port 5000 whose listener is expecting the PROXYPROTOCOL headers. And the container has a tcp processes listening on port 5001 that is not expecting the PROXYPROTOCOL headers:
+        * the `nginx.layer4` label has the value `tcp@pptrue:5000,tcp@ppfalse:5001`
+        * this will add TCP listeners to your nignx containers on port 5000 and 5001 that forward TCP traffic to your container(s) on port 5000 and 5001 with traffic to port 5000 having the PROXYPROTOCOL header injected while traffic to 5001 is left plain.
+* nginx.layer7 = the configuration of your layer7 listener
+    * uses the format `protocol @ proxy protocol true or false: port nginx and your service listen on` 
+    * currently the container only supports one hostname per backend container
+    * the only valid protocols are `http`, `https`, `ws`, or `wss`
+    * For example: I have a container that should recieve http traffic on port 5000 without the PROXYPROTOCOL headers.
+        * the `nginx.layer7` label has the value `http@ppfalse:5000`
+        * this will forward all traffic that reaches nginx on layer 7 with the hostname given by `nginx.fqdn` to your backend container via http protocol on port 5000.
 * nginx.fqdn= *Fully Qualified Domain Name to route rules. Multiple domains separated by ",". Be careful, collisions are possible!*
     * **OPTIONAL:** only required if setting nginx.enable to manual. This label sets the fqdn
-* nginx.proxyprotocol= *true | false*
-    * **OPTIONAL:** only required if the backend service is expecting incoming traffic with the PROXY_PROTOCOL header
 
 
 
