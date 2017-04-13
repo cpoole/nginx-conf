@@ -129,6 +129,6 @@ COPY ./nginx/nginx.conf /etc/nginx/nginx.conf
 COPY ./nginx-init /init
 ADD ./certs/ /certs/
 
-EXPOSE 80 443 8001
+EXPOSE 80 443 8001 48700-48796
 
 ENTRYPOINT ["/init"]
